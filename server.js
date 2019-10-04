@@ -1,23 +1,13 @@
-// Dependencies
 var express = require("express");
-var mongojs = require("mongojs");
-// Require axios and cheerio. This makes the scraping possible
-var axios = require("axios");
-var cheerio = require("cheerio");
 var logger = require("morgan");
 var mongoose = require("mongoose");
-
+var app = express();
+var axios = require("axios");
+var cheerio = require("cheerio");
 var PORT = 3000;
 
 // Require all models
 var db = require("./models");
-
-// Initialize Express
-var app = express();
-
-// Database configuration
-var databaseUrl = "scrapeREArticles";
-var collections = ["scrapedData"];
 
 // Use morgan logger for logging requests
 app.use(logger("dev"));
@@ -28,13 +18,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 // Connect to the Mongo DB
-mongoose.connect("mongodb://localhost/populatedb", { useNewUrlParser: true });
-
-// Hook mongojs configuration to the db variable
-var db = mongojs(databaseUrl, collections);
-db.on("error", function(error) {
-  console.log("Database Error:", error);
-});
+mongoose.connect("mongodb://localhost/scrapeREArticles", { useNewUrlParser: true });
 
 // Main route (simple Hello World Message)
 app.get("/", function(req, res) {
@@ -42,26 +26,27 @@ app.get("/", function(req, res) {
 });
 
 // Scrape data from one site and place it into the mongodb db
-app.get("/", function(req, res) {
-  axios.get("https://magazine.realtor/").then(function(response) {
+app.get("/scrape", function(req, res) {
+  axios.get("https://magazine.realtor/daily-news").then(function(response) {
 
     var $ = cheerio.load(response.data);
 
-    $(".article--teaser__body").each(function(i, element) {
+    $(".views-row").each(function(i, element) {
 
-      var title = $(element).children(".node__title").children("a").text();
-      var link = $(element).children(".node__title").children("a").attr("href");
-      var description = $(element).children(".field-item").text();
+      var result = $(element).children();
+      var title = result.find(".layout-slat__content").find(".layout-slat__header").find(".node__title").text();
+      var link = result.find(".layout-slat__content").find(".layout-slat__header").find(".node__title").find("a").attr("href");
+      var paragraph = result.find(".layout-slat__content").find(".layout-slat__main-content").find("p").text();
 
       console.log(title);
       console.log(link);
-      console.log(description);
+      console.log(paragraph);
 
-      if (title && link && description) {
+      if (title && link && paragraph) {
         db.scrapedData.insert({
           title: title,
           link: link,
-          description: description
+          paragraph: paragraph
         },
         function(err, inserted) {
           if (err) {
@@ -107,38 +92,51 @@ app.get("/comments", function(req, res) {
 
 // Route for retrieving all Articles from the db
 app.get("/articles", function(req, res) {
+  // Find all Articles
   db.Article.find({})
     .then(function(dbArticle) {
+      // If all Articles are successfully found, send them back to the client
       res.json(dbArticle);
     })
     .catch(function(err) {
+      // If an error occurs, send the error back to the client
       res.json(err);
     });
 });
 
-// Route for saving a new Comment to the db and associating it with a Article
+// Route for saving a new Comment to the db and associating it with an Article
 app.post("/submit", function(req, res) {
+  // Create a new Comment in the db
   db.Comment.create(req.body)
     .then(function(dbComment) {
+      // If a Comment was created successfully, find one Article and push the new Articles' _id to the Articles' `comments` array
+      // { new: true } tells the query that we want it to return the updated Article -- it returns the original by default
+      // Since our mongoose query returns a promise, we can chain another `.then` which receives the result of the query
       return db.Article.findOneAndUpdate({},
-        { $push: { notes: dbComment._id } }, { new: true });
+        { $push: { comments: dbComment._id } }, { new: true });
     })
     .then(function(dbArticle) {
+      // If the Article was updated successfully, send it back to the client
       res.json(dbArticle);
     })
     .catch(function(err) {
+      // If an error occurs, send it back to the client
       res.json(err);
     });
 });
 
 // Route to get all Articles and populate them with their comments
 app.get("/populatedarticle", function(req, res) {
-  db.User.find({})
+  // Find all Articles
+  db.Article.find({})
+    // Specify that we want to populate the retrieved articles with any associated comments
     .populate("comments")
     .then(function(dbArticle) {
+      // If able to successfully find and associate all Articles and Comments, send them back to the client
       res.json(dbArticle);
     })
     .catch(function(err) {
+      // If an error occurs, send it back to the client
       res.json(err);
     });
 });
@@ -147,3 +145,8 @@ app.get("/populatedarticle", function(req, res) {
 app.listen(PORT, function() {
   console.log("App running on port " + PORT + "!");
 });
+
+
+
+
+

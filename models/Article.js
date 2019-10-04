@@ -14,7 +14,7 @@ var ArticleSchema = new Schema({
     type: String,
     unique: true
   },
-  description: {
+  paragraph: {
     type: String
   },
   comments: [

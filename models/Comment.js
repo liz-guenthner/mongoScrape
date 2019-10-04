@@ -5,7 +5,7 @@ var Schema = mongoose.Schema;
 
 // Using the Schema constructor, create a new CommentSchema object
 // This is similar to a Sequelize model
-var CommentSchema = new Schema({
+var commentSchema = new Schema({
   // `title` must be of type String
   title: String,
   // `body` must be of type String
@@ -13,7 +13,7 @@ var CommentSchema = new Schema({
 });
 
 // This creates our model from the above schema, using mongoose's model method
-var Comment = mongoose.model("Comment", CommentSchema);
+var Comment = mongoose.model("Comment", commentSchema);
 
 // Export the Comment model
 module.exports = Comment;
